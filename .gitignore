@@ -1,0 +1,25 @@
+# Flutter
+app/build/
+app/.dart_tool/
+app/.packages
+app/pubspec.lock
+app/*.iml
+app/android/.gradle/
+app/android/.idea/
+app/ios/Pods/
+
+# Python
+ml/__pycache__/
+ml/*.pyc
+ml/*.pyo
+ml/*.pyd
+ml/.env
+ml/.venv
+ml/venv/
+ml/ENV/
+ml/env/
+ml/.ipynb_checkpoints/
+ml/runs/
+
+# macOS
+.DS_Store
