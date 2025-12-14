@@ -1,4 +1,4 @@
-# detecto_ai
+# app
 
 A new Flutter project.
 
