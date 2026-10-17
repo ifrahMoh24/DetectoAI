@@ -12,16 +12,16 @@ void main() {
     ),
   );
 
-  runApp(const TrustifyApp());
+  runApp(const DetectoAIApp());
 }
 
-class TrustifyApp extends StatelessWidget {
-  const TrustifyApp({super.key});
+class DetectoAIApp extends StatelessWidget {
+  const DetectoAIApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Trustify',
+      title: 'DetectoAI',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

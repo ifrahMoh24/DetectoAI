@@ -202,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ],
                         ).createShader(bounds),
                         child: const Text(
-                          'Trustify',
+                          'DetectoAI',
                           style: TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.bold,
