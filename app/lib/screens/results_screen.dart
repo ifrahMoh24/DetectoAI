@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import '../services/resale_calculator.dart';
+import '../services/history_service.dart';
+import '../models/scan_result.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String imagePath;
@@ -17,20 +19,28 @@ class ResultsScreen extends StatefulWidget {
   State<ResultsScreen> createState() => _ResultsScreenState();
 }
 
-class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateMixin {
+class _ResultsScreenState extends State<ResultsScreen>
+    with TickerProviderStateMixin {
   final ResaleCalculator _calculator = ResaleCalculator();
+  final HistoryService _historyService = HistoryService();
   String _selectedPhone = 'iPhone 14 Pro';
-  
+  bool _savedToHistory = false;
+
   late AnimationController _fadeController;
   late AnimationController _scaleController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
+  static const kBg = Color(0xFF0A0F1E);
+  static const kCard = Color(0xFF1E293B);
+  static const kBorder = Color(0xFF334155);
+  static const kTextSub = Color(0xFF94A3B8);
+
   final Map<String, Color> _damageColors = {
-    'crack': const Color(0xFFEF4444), // Red
-    'dent': const Color(0xFFF97316), // Orange
-    'scratch': const Color(0xFFFBBF24), // Yellow
-    'pristine': const Color(0xFF10B981), // Mint green
+    'crack': const Color(0xFFEF4444),
+    'dent': const Color(0xFFF97316),
+    'scratch': const Color(0xFFFBBF24),
+    'pristine': const Color(0xFF10B981),
   };
 
   final Map<String, IconData> _damageIcons = {
@@ -43,29 +53,42 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700),
       vsync: this,
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
-    
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+
     _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
     );
-    
+
     _fadeController.forward();
     _scaleController.forward();
-    
-    // Success haptic
     HapticFeedback.mediumImpact();
+
+    _autoSave();
+  }
+
+  Future<void> _autoSave() async {
+    final probabilities = widget.prediction['probabilities'] as Map<String, dynamic>? ?? {};
+    final result = ScanResult(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      imagePath: widget.imagePath,
+      damageType: _detectedClass,
+      confidence: widget.prediction['confidence'] ?? 0.0,
+      phoneModel: _selectedPhone,
+      scannedAt: DateTime.now(),
+      probabilities: probabilities.map((k, v) => MapEntry(k, (v as num).toDouble())),
+    );
+    await _historyService.saveResult(result);
+    if (mounted) setState(() => _savedToHistory = true);
   }
 
   @override
@@ -77,125 +100,114 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
 
   String get _detectedClass => widget.prediction['class'] ?? 'unknown';
   double get _confidence => (widget.prediction['confidence'] ?? 0.0) * 100;
+  Color get _accentColor =>
+      _damageColors[_detectedClass] ?? const Color(0xFF10B981);
 
   @override
   Widget build(BuildContext context) {
     final valuation = _calculator.calculateValue(_selectedPhone, _detectedClass);
-    
+
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFF0FDFA),
-              const Color(0xFFCCFBF1),
-              const Color(0xFFD1FAE5).withOpacity(0.5),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              _buildHeader(),
-              
-              // Scrollable content
-              Expanded(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image preview
-                        _buildImagePreview(),
-                        
-                        const SizedBox(height: 32),
-                        
-                        // Main result card
-                        _buildMainResultCard(),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // All probabilities
-                        _buildAllProbabilities(),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Phone selector
-                        _buildPhoneSelector(),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Value calculator
-                        _buildValueCalculator(valuation),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Repair costs (if damaged)
-                        if (_detectedClass != 'pristine')
-                          _buildRepairCosts(),
-                        
-                        if (_detectedClass != 'pristine')
-                          const SizedBox(height: 24),
-                        
-                        // Recommendations
-                        _buildRecommendations(),
-                        
-                        const SizedBox(height: 32),
-                        
-                        // Action buttons
-                        _buildActionButtons(),
-                        
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
+      backgroundColor: kBg,
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildImagePreview(),
+                    const SizedBox(height: 20),
+                    _buildResultCard(),
+                    const SizedBox(height: 16),
+                    _buildProbabilitiesCard(),
+                    const SizedBox(height: 16),
+                    _buildPhoneSelector(),
+                    const SizedBox(height: 16),
+                    _buildValueCard(valuation),
+                    if (_detectedClass != 'pristine') ...[
+                      const SizedBox(height: 16),
+                      _buildRepairCard(),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildRecommendationsCard(),
+                    const SizedBox(height: 20),
+                    _buildActionButtons(),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF065F46)),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFF0FDFA),
-              padding: const EdgeInsets.all(12),
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: const BoxDecoration(
+          color: kBg,
+          border: Border(bottom: BorderSide(color: kBorder)),
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorder),
+                ),
+                child: const Icon(Icons.arrow_back_rounded,
+                    color: Colors.white, size: 20),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          const Text(
-            'Verification Report',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF065F46),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Text(
+                'Scan Report',
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
             ),
-          ),
-        ],
+            if (_savedToHistory)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: const Color(0xFF10B981).withOpacity(0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded,
+                        color: Color(0xFF10B981), size: 14),
+                    SizedBox(width: 5),
+                    Text('Saved',
+                        style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -205,128 +217,79 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
       scale: _scaleAnimation,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _accentColor, width: 3),
           boxShadow: [
             BoxShadow(
-              color: _damageColors[_detectedClass]!.withOpacity(0.3),
+              color: _accentColor.withOpacity(0.25),
               blurRadius: 30,
-              spreadRadius: 5,
-              offset: const Offset(0, 10),
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: _damageColors[_detectedClass]!,
-                width: 4,
-              ),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.file(
-                File(widget.imagePath),
-                height: 240,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
+          borderRadius: BorderRadius.circular(17),
+          child: Image.file(
+            File(widget.imagePath),
+            height: 220,
+            width: double.infinity,
+            fit: BoxFit.cover,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMainResultCard() {
+  Widget _buildResultCard() {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _damageColors[_detectedClass]!.withOpacity(0.1),
-            _damageColors[_detectedClass]!.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: _damageColors[_detectedClass]!.withOpacity(0.3),
-          width: 2,
-        ),
+        color: kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _accentColor.withOpacity(0.4)),
       ),
       child: Column(
         children: [
-          // Icon
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  _damageColors[_detectedClass]!,
-                  _damageColors[_detectedClass]!.withOpacity(0.8),
-                ],
-              ),
+              color: _accentColor.withOpacity(0.15),
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _damageColors[_detectedClass]!.withOpacity(0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              border: Border.all(color: _accentColor.withOpacity(0.4)),
             ),
-            child: Icon(
-              _damageIcons[_detectedClass],
-              size: 48,
-              color: Colors.white,
-            ),
+            child: Icon(_damageIcons[_detectedClass] ?? Icons.help_outline,
+                size: 44, color: _accentColor),
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Result text
+          const SizedBox(height: 16),
           Text(
             _getResultTitle(),
             style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: _damageColors[_detectedClass],
-              letterSpacing: -0.5,
-            ),
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: _accentColor,
+                letterSpacing: -0.5),
             textAlign: TextAlign.center,
           ),
-          
-          const SizedBox(height: 12),
-          
-          // Confidence
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _damageColors[_detectedClass]!.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
+              color: _accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               '${_confidence.toStringAsFixed(1)}% Confidence',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _damageColors[_detectedClass],
-              ),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: _accentColor),
             ),
           ),
-          
-          const SizedBox(height: 16),
-          
-          // Description
+          const SizedBox(height: 14),
           Text(
             _getResultDescription(),
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.grey.shade700,
-              height: 1.5,
-            ),
+            style: const TextStyle(fontSize: 14, color: kTextSub, height: 1.6),
             textAlign: TextAlign.center,
           ),
         ],
@@ -334,416 +297,220 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildAllProbabilities() {
-    final probabilities = widget.prediction['probabilities'] as Map<String, dynamic>?;
-    
-    if (probabilities == null) return const SizedBox();
-    
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.2),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+  Widget _buildProbabilitiesCard() {
+    final probabilities =
+        widget.prediction['probabilities'] as Map<String, dynamic>?;
+    if (probabilities == null || probabilities.isEmpty) return const SizedBox();
+
+    return _buildCard(
+      icon: Icons.analytics_rounded,
+      title: 'Detection Details',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF6EE7B7)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.analytics_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Detection Details',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 20),
-          
-          ...probabilities.entries.map((entry) {
-            final probability = (entry.value * 100);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            _damageIcons[entry.key],
-                            size: 18,
-                            color: _damageColors[entry.key],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            entry.key.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${probability.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _damageColors[entry.key],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: probability / 100,
-                      minHeight: 8,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _damageColors[entry.key]!,
-                      ),
+        children: probabilities.entries.map((entry) {
+          final pct = (entry.value as num).toDouble() * 100;
+          final color = _damageColors[entry.key] ?? Colors.grey;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(_damageIcons[entry.key] ?? Icons.circle,
+                            size: 16, color: color),
+                        const SizedBox(width: 8),
+                        Text(entry.key.toUpperCase(),
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
+                      ],
                     ),
+                    Text('${pct.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: color)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: pct / 100,
+                    minHeight: 7,
+                    backgroundColor: const Color(0xFF334155),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
-                ],
-              ),
-            );
-          }),
-        ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
   Widget _buildPhoneSelector() {
     final phones = ResaleCalculator.baseValues.keys.toList();
-    
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.2),
-          width: 2,
+    return _buildCard(
+      icon: Icons.phone_iphone_rounded,
+      title: 'Select Phone Model',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0F1E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+        ),
+        child: DropdownButton<String>(
+          value: _selectedPhone,
+          isExpanded: true,
+          underline: const SizedBox(),
+          dropdownColor: const Color(0xFF1E293B),
+          icon: const Icon(Icons.keyboard_arrow_down,
+              color: Color(0xFF10B981)),
+          style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white),
+          items: phones
+              .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+              .toList(),
+          onChanged: (value) {
+            if (value != null) {
+              HapticFeedback.lightImpact();
+              setState(() => _selectedPhone = value);
+            }
+          },
         ),
       ),
+    );
+  }
+
+  Widget _buildValueCard(Map<String, dynamic> valuation) {
+    return _buildCard(
+      icon: Icons.attach_money_rounded,
+      title: 'Fair Price Estimate',
+      accentColor: const Color(0xFF10B981),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF6EE7B7)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.phone_iphone_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Select Phone Model',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDFA),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF10B981).withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            child: DropdownButton<String>(
-              value: _selectedPhone,
-              isExpanded: true,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF10B981)),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF065F46),
-              ),
-              items: phones.map((phone) {
-                return DropdownMenuItem(
-                  value: phone,
-                  child: Text(phone),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    _selectedPhone = value;
-                  });
-                }
-              },
-            ),
-          ),
+          _valueRow('Original Value', '\$${valuation['baseValue']}',
+              kTextSub, false),
+          if ((valuation['lossPercentage'] as int) > 0) ...[
+            const SizedBox(height: 10),
+            _valueRow('Damage Impact', '-${valuation['lossPercentage']}%',
+                const Color(0xFFEF4444), false),
+            const SizedBox(height: 10),
+            _valueRow('Value Lost', '-\$${valuation['loss']}',
+                const Color(0xFFEF4444), false),
+            const SizedBox(height: 14),
+            const Divider(color: kBorder),
+            const SizedBox(height: 14),
+          ],
+          _valueRow('Fair Value Now', '\$${valuation['currentValue']}',
+              const Color(0xFF10B981), true),
         ],
       ),
     );
   }
 
-  Widget _buildValueCalculator(Map<String, dynamic> valuation) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF10B981).withOpacity(0.1),
-            const Color(0xFF6EE7B7).withOpacity(0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF6EE7B7)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.attach_money_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Fair Price Estimate',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Base value
-          _buildValueRow(
-            'Original Value',
-            '\$${valuation['baseValue']}',
-            Colors.grey.shade700,
-            false,
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Damage impact
-          if (valuation['lossPercentage'] > 0) ...[
-            _buildValueRow(
-              'Damage Impact',
-              '-${valuation['lossPercentage']}%',
-              const Color(0xFFEF4444),
-              false,
-            ),
-            const SizedBox(height: 12),
-            _buildValueRow(
-              'Value Loss',
-              '-\$${valuation['loss']}',
-              const Color(0xFFEF4444),
-              false,
-            ),
-            const SizedBox(height: 16),
-            const Divider(thickness: 1.5),
-            const SizedBox(height: 16),
-          ],
-          
-          // Current value
-          _buildValueRow(
-            'Current Fair Value',
-            '\$${valuation['currentValue']}',
-            const Color(0xFF10B981),
-            true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildValueRow(String label, String value, Color color, bool isBold) {
+  Widget _valueRow(String label, String value, Color color, bool bold) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isBold ? 18 : 15,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-            color: Colors.grey.shade700,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isBold ? 26 : 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
+        Text(label,
+            style: const TextStyle(fontSize: 14, color: kTextSub)),
+        Text(value,
+            style: TextStyle(
+                fontSize: bold ? 24 : 15,
+                fontWeight: FontWeight.bold,
+                color: color)),
       ],
     );
   }
 
-  Widget _buildRepairCosts() {
+  Widget _buildRepairCard() {
     final costs = _getRepairCosts();
-    
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFF97316).withOpacity(0.3),
-          width: 2,
+    return _buildCard(
+      icon: Icons.build_rounded,
+      title: 'Estimated Repair Cost',
+      accentColor: const Color(0xFFF97316),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF97316).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF97316).withOpacity(0.3)),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF97316).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.build_rounded,
-                  color: Color(0xFFF97316),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Estimated Repair Costs',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF7ED),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Repair Range',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                Text(
-                  costs,
-                  style: const TextStyle(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Repair Range',
+                style: TextStyle(fontSize: 14, color: kTextSub)),
+            Text(costs,
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFF97316),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                    color: Color(0xFFF97316))),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRecommendations() {
-    final recommendations = _getRecommendations();
-    
+  Widget _buildRecommendationsCard() {
+    final recs = _getRecommendations();
+    return _buildCard(
+      icon: Icons.tips_and_updates_rounded,
+      title: 'Smart Tips',
+      accentColor: const Color(0xFF3B82F6),
+      child: Column(
+        children: recs.map((rec) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 3),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      size: 12, color: Color(0xFF3B82F6)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(rec,
+                      style: const TextStyle(
+                          fontSize: 14, color: kTextSub, height: 1.5)),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required String title,
+    required Widget child,
+    Color accentColor = const Color(0xFF10B981),
+  }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF3B82F6).withOpacity(0.1),
-            const Color(0xFF60A5FA).withOpacity(0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF3B82F6).withOpacity(0.3),
-          width: 2,
-        ),
+        color: kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,65 +518,23 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF60A5FA)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.tips_and_updates_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: Icon(icon, color: accentColor, size: 18),
               ),
-              const SizedBox(width: 12),
-              const Text(
-                'Smart Recommendations',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white)),
             ],
           ),
-          
           const SizedBox(height: 16),
-          
-          ...recommendations.map((rec) => Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 14,
-                    color: Color(0xFF3B82F6),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    rec,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )),
+          child,
         ],
       ),
     );
@@ -820,38 +545,27 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
       children: [
         SizedBox(
           width: double.infinity,
-          height: 58,
+          height: 56,
           child: ElevatedButton.icon(
             onPressed: () {
               HapticFeedback.mediumImpact();
               Navigator.pop(context);
             },
-            icon: const Icon(Icons.camera_alt_rounded, size: 24),
-            label: const Text(
-              'Scan Another Device',
-              style: TextStyle(fontSize: 17),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-            ),
+            icon: const Icon(Icons.camera_alt_rounded, size: 22),
+            label: const Text('Scan Another Device'),
           ),
         ),
-        
-        const SizedBox(height: 14),
-        
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
-          height: 58,
+          height: 56,
           child: OutlinedButton.icon(
             onPressed: () {
               HapticFeedback.lightImpact();
               Navigator.popUntil(context, (route) => route.isFirst);
             },
-            icon: const Icon(Icons.home_rounded, size: 24),
-            label: const Text(
-              'Back to Home',
-              style: TextStyle(fontSize: 17),
-            ),
+            icon: const Icon(Icons.home_rounded, size: 22),
+            label: const Text('Back to Home'),
           ),
         ),
       ],
@@ -861,7 +575,7 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
   String _getResultTitle() {
     switch (_detectedClass) {
       case 'pristine':
-        return 'Excellent Condition! ✓';
+        return 'Excellent Condition!';
       case 'scratch':
         return 'Minor Scratches';
       case 'dent':
@@ -876,13 +590,13 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
   String _getResultDescription() {
     switch (_detectedClass) {
       case 'pristine':
-        return 'This device appears to be in excellent condition with no visible damage. Great find!';
+        return 'No visible damage detected. This device appears to be in excellent condition — a great find!';
       case 'scratch':
-        return 'Surface scratches detected. These are cosmetic but may affect resale value slightly.';
+        return 'Surface scratches detected. These are cosmetic and may slightly affect resale value.';
       case 'dent':
-        return 'Body dent detected. This may indicate impact damage. Check functionality carefully.';
+        return 'Body dent detected. This may indicate impact damage — check functionality carefully.';
       case 'crack':
-        return 'Screen crack detected. This significantly impacts value and may affect functionality.';
+        return 'Screen crack detected. This significantly impacts value and may affect daily use.';
       default:
         return 'AI analysis completed successfully.';
     }
@@ -891,11 +605,11 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
   String _getRepairCosts() {
     switch (_detectedClass) {
       case 'crack':
-        return '\$100 - \$300';
+        return '\$100 – \$300';
       case 'dent':
-        return '\$80 - \$200';
+        return '\$80 – \$200';
       case 'scratch':
-        return '\$50 - \$120';
+        return '\$50 – \$120';
       default:
         return 'N/A';
     }
@@ -905,36 +619,33 @@ class _ResultsScreenState extends State<ResultsScreen> with TickerProviderStateM
     switch (_detectedClass) {
       case 'pristine':
         return [
-          'This is a fair price for excellent condition',
-          'Verify all features work properly before buying',
+          'Fair price for excellent condition',
+          'Verify all features work before buying',
           'Check battery health if possible',
-          'Confirm warranty status and purchase proof',
-          'Ask about original accessories included',
+          'Confirm warranty and purchase proof',
+          'Ask about original accessories',
         ];
       case 'scratch':
         return [
-          'Negotiate 10-15% off asking price',
-          'Scratches are cosmetic but reduce resale value',
-          'Consider using a case to cover marks',
-          'Verify screen and camera are not affected',
-          'Ask seller about cause of scratches',
+          'Negotiate 10–15% off asking price',
+          'Scratches are cosmetic only',
+          'Verify screen and camera unaffected',
+          'Use a case to cover marks',
         ];
       case 'dent':
         return [
-          'Negotiate 20-25% off asking price',
+          'Negotiate 20–25% off asking price',
           'Check for water damage indicators',
-          'Test all buttons and features thoroughly',
-          'Inspect internal components if possible',
-          'Consider repair costs in final offer',
+          'Test all buttons and ports thoroughly',
+          'Factor repair cost into your offer',
         ];
       case 'crack':
         return [
-          'Negotiate 30-40% off asking price',
-          'Factor in screen replacement cost (\$100-300)',
-          'Check if crack affects touch functionality',
-          'Inspect for glass fragments that could spread',
-          'Consider if repair is worth the total cost',
+          'Negotiate 30–40% off asking price',
+          'Factor in screen replacement (\$100–300)',
+          'Check if crack affects touch input',
           'Ask if still under warranty or AppleCare',
+          'Inspect for spreading cracks',
         ];
       default:
         return ['Verify device thoroughly before purchase'];

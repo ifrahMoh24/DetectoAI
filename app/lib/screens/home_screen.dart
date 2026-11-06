@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'analysis_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,36 +14,36 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
-  
-  late AnimationController _fadeController;
+
   late AnimationController _pulseController;
-  late Animation<double> _fadeAnimation;
+  late AnimationController _fadeController;
   late Animation<double> _pulseAnimation;
+  late Animation<double> _fadeAnimation;
+
+  static const kBg = Color(0xFF0A0F1E);
+  static const kCard = Color(0xFF1E293B);
+  static const kBorder = Color(0xFF334155);
+  static const kAccent = Color(0xFF10B981);
+  static const kTextSub = Color(0xFF94A3B8);
 
   @override
   void initState() {
     super.initState();
-    
-    // Fade-in animation
+
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
-    
-    // Gentle pulse for shield logo
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2200),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+    _pulseAnimation = Tween<double>(begin: 0.92, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     _fadeController.forward();
   }
 
@@ -53,14 +54,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _triggerHaptic() {
-    HapticFeedback.mediumImpact();
-  }
-
   Future<void> _pickImage(ImageSource source) async {
-    _triggerHaptic();
+    HapticFeedback.mediumImpact();
     setState(() => _isLoading = true);
-
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -68,47 +64,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         maxHeight: 1024,
         imageQuality: 85,
       );
-
       if (image != null && mounted) {
         HapticFeedback.lightImpact();
-        
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                AnalysisScreen(imagePath: image.path),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.0, 0.05),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOut,
-                  )),
-                  child: child,
-                ),
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 400),
+            pageBuilder: (_, anim, __) => AnalysisScreen(imagePath: image.path),
+            transitionsBuilder: (_, anim, __, child) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.04),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+                child: child,
+              ),
+            ),
+            transitionDuration: const Duration(milliseconds: 350),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         HapticFeedback.heavyImpact();
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Error: $e')),
-              ],
-            ),
+            content: Text('Error: $e'),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -117,247 +98,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFF0FDFA), // Ultra light mint
-              const Color(0xFFCCFBF1), // Light mint
-              const Color(0xFFD1FAE5).withOpacity(0.5), // Soft mint
-            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D1526), Color(0xFF0A0F1E)],
           ),
         ),
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 20),
-                  
-                  // Premium Logo & Branding
-                  Column(
-                    children: [
-                      // Animated pulsing shield logo
-                      ScaleTransition(
-                        scale: _pulseAnimation,
-                        child: Container(
-                          width: 110,
-                          height: 110,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF10B981), // Mint green
-                                Color(0xFF6EE7B7), // Light mint
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF10B981).withOpacity(0.4),
-                                blurRadius: 40,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 15),
-                              ),
-                              BoxShadow(
-                                color: const Color(0xFF6EE7B7).withOpacity(0.3),
-                                blurRadius: 60,
-                                spreadRadius: 10,
-                                offset: const Offset(0, 25),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.verified_user_rounded,
-                            size: 58,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // App Name with gradient
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            Color(0xFF059669), // Dark mint
-                            Color(0xFF10B981), // Mint green
-                            Color(0xFF34D399), // Light mint
-                          ],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Trustify',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: -1.5,
-                            height: 1.1,
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Tagline
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF10B981).withOpacity(0.15),
-                              const Color(0xFF6EE7B7).withOpacity(0.15),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: const Color(0xFF10B981).withOpacity(0.3),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Text(
-                          'Verify Before You Buy',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF065F46),
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // Trust message banner
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white,
-                          const Color(0xFFF0FDFA),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: const Color(0xFF10B981).withOpacity(0.2),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Row(
+            child: Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF10B981), Color(0xFF6EE7B7)],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.shield_outlined,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(width: 18),
-                        const Expanded(
-                          child: Text(
-                            'Never overpay for used electronics again',
-                            style: TextStyle(
-                              fontSize: 16,
-                              height: 1.5,
-                              color: Color(0xFF065F46),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                        const SizedBox(height: 32),
+                        _buildHero(),
+                        const SizedBox(height: 48),
+                        _isLoading ? _buildLoadingState() : _buildScanButtons(),
+                        const SizedBox(height: 36),
+                        _buildFeatureRow(),
+                        const SizedBox(height: 32),
+                        _buildStatsRow(),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                  
-                  const SizedBox(height: 36),
-                  
-                  // Feature cards
-                  _buildFeatureCard(
-                    icon: Icons.auto_awesome_rounded,
-                    title: 'AI-Powered Detection',
-                    description: '97.5% accuracy in damage detection',
-                    gradient: const [Color(0xFF10B981), Color(0xFF34D399)],
-                    delay: 200,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildFeatureCard(
-                    icon: Icons.speed_rounded,
-                    title: 'Instant Results',
-                    description: 'Get detailed report in 5 seconds',
-                    gradient: const [Color(0xFF059669), Color(0xFF10B981)],
-                    delay: 300,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildFeatureCard(
-                    icon: Icons.price_check_rounded,
-                    title: 'Fair Price Check',
-                    description: 'Know true value before paying',
-                    gradient: const [Color(0xFF047857), Color(0xFF059669)],
-                    delay: 400,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildFeatureCard(
-                    icon: Icons.psychology_rounded,
-                    title: 'Smart Negotiation',
-                    description: 'Get tips to negotiate better deals',
-                    gradient: const [Color(0xFF065F46), Color(0xFF047857)],
-                    delay: 500,
-                  ),
-                  
-                  const SizedBox(height: 44),
-                  
-                  // Action buttons
-                  if (_isLoading)
-                    _buildLoadingState()
-                  else
-                    _buildActionButtons(),
-                  
-                  const SizedBox(height: 36),
-                  
-                  // Trust stats
-                  _buildTrustStats(),
-                  
-                  const SizedBox(height: 24),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -365,288 +146,283 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildFeatureCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required List<Color> gradient,
-    required int delay,
-  }) {
-    return TweenAnimationBuilder(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 800 + delay),
-      curve: Curves.easeOut,
-      builder: (context, double value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 30 * (1 - value)),
-            child: child,
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: kAccent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.search_rounded, color: kAccent, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'DetectoAI',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: gradient[0].withOpacity(0.2),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: gradient[0].withOpacity(0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: gradient),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: gradient[0].withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                color: kCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: kBorder),
               ),
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: const Icon(Icons.history_rounded, color: Colors.white, size: 22),
             ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF065F46),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildHero() {
+    return Column(
+      children: [
+        ScaleTransition(
+          scale: _pulseAnimation,
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF059669)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: kAccent.withOpacity(0.4),
+                  blurRadius: 50,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.document_scanner_rounded, size: 56, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 28),
+        const Text(
+          'DetectoAI',
+          style: TextStyle(
+            fontSize: 42,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: -1.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'AI-Powered Phone Damage Scanner',
+          style: TextStyle(
+            fontSize: 16,
+            color: kTextSub,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: kAccent.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kAccent.withOpacity(0.3)),
+          ),
+          child: const Text(
+            'Detect cracks · dents · scratches',
+            style: TextStyle(
+              fontSize: 13,
+              color: kAccent,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScanButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 62,
+          child: ElevatedButton(
+            onPressed: () => _pickImage(ImageSource.camera),
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: kAccent,
+              shadowColor: kAccent.withOpacity(0.5),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.camera_alt_rounded, size: 26),
+                SizedBox(width: 14),
+                Text('Scan with Camera', style: TextStyle(fontSize: 17)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          height: 62,
+          child: OutlinedButton(
+            onPressed: () => _pickImage(ImageSource.gallery),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.photo_library_rounded, size: 26),
+                SizedBox(width: 14),
+                Text('Choose from Gallery', style: TextStyle(fontSize: 17)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildLoadingState() {
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(36),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.3),
-          width: 2,
-        ),
+        color: kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder),
       ),
       child: Column(
         children: [
-          SizedBox(
-            width: 50,
-            height: 50,
+          const SizedBox(
+            width: 44,
+            height: 44,
             child: CircularProgressIndicator(
-              strokeWidth: 4,
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(kAccent),
             ),
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'Preparing...',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF065F46),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'This will only take a moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
+          const SizedBox(height: 20),
+          const Text('Preparing...', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
+          const SizedBox(height: 6),
+          const Text('Just a moment', style: TextStyle(fontSize: 14, color: kTextSub)),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
-    return Column(
-      children: [
-        // Primary CTA - Camera
-        SizedBox(
-          width: double.infinity,
-          height: 66,
-          child: ElevatedButton(
-            onPressed: () => _pickImage(ImageSource.camera),
-            style: ElevatedButton.styleFrom(
-              elevation: 8,
-              shadowColor: const Color(0xFF10B981).withOpacity(0.5),
-              backgroundColor: const Color(0xFF10B981),
+  Widget _buildFeatureRow() {
+    final features = [
+      (Icons.auto_awesome_rounded, 'AI Detection', '97.5% accuracy'),
+      (Icons.bolt_rounded, 'Instant', 'Results in 5s'),
+      (Icons.price_check_rounded, 'Fair Price', 'Value estimate'),
+    ];
+
+    return Row(
+      children: features.map((f) {
+        return Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            decoration: BoxDecoration(
+              color: kCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kBorder),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.camera_alt_rounded, size: 28),
-                SizedBox(width: 16),
+            child: Column(
+              children: [
+                Icon(f.$1, color: kAccent, size: 26),
+                const SizedBox(height: 8),
                 Text(
-                  'Scan with Camera',
-                  style: TextStyle(fontSize: 18, letterSpacing: 0.5),
+                  f.$2,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  f.$3,
+                  style: const TextStyle(fontSize: 11, color: kTextSub),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Secondary CTA - Gallery
-        SizedBox(
-          width: double.infinity,
-          height: 66,
-          child: OutlinedButton(
-            onPressed: () => _pickImage(ImageSource.gallery),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.photo_library_rounded, size: 28),
-                SizedBox(width: 16),
-                Text(
-                  'Choose from Gallery',
-                  style: TextStyle(fontSize: 18, letterSpacing: 0.5),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildTrustStats() {
+  Widget _buildStatsRow() {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF10B981).withOpacity(0.08),
-            const Color(0xFF6EE7B7).withOpacity(0.08),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.2),
-          width: 2,
-        ),
+        color: kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.verified_rounded,
-                value: '97.5%',
-                label: 'Accuracy',
-              ),
-              _buildStatDivider(),
-              _buildStatItem(
-                icon: Icons.bolt,
-                value: '5s',
-                label: 'Speed',
-              ),
-              _buildStatDivider(),
-              _buildStatItem(
-                icon: Icons.security_rounded,
-                value: '100%',
-                label: 'Secure',
-              ),
-            ],
-          ),
+          _buildStat('97.5%', 'Accuracy'),
+          _buildDivider(),
+          _buildStat('5s', 'Speed'),
+          _buildDivider(),
+          _buildStat('4', 'Damage Types'),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
+  Widget _buildStat(String value, String label) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF10B981), Color(0xFF6EE7B7)],
-            ),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: Colors.white, size: 26),
-        ),
-        const SizedBox(height: 12),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 24,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF065F46),
+            color: kAccent,
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: kTextSub)),
       ],
     );
   }
 
-  Widget _buildStatDivider() {
+  Widget _buildDivider() {
     return Container(
-      width: 1.5,
-      height: 60,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            const Color(0xFF10B981).withOpacity(0.4),
-            Colors.transparent,
-          ],
-        ),
-      ),
+      width: 1,
+      height: 36,
+      color: const Color(0xFF334155),
     );
   }
 }
