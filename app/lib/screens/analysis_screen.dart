@@ -99,7 +99,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                     'description': result.description,
                     'emoji': result.emoji,
                     'colorHex': result.colorHex,
-                    'allPredictions': result.allPredictions,
+                    'probabilities': result.allPredictions,
                   },
                 ),
             transitionsBuilder:
