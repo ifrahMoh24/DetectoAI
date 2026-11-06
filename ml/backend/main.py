@@ -44,9 +44,7 @@ async def detect_damage(file: UploadFile = File(...)):
     if model is None:
         raise HTTPException(status_code=500, detail="Model not loaded on server")
 
-    # Basic content check
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
+    # Accept any content type — validate by actually opening with PIL below
 
     # Read bytes and open with PIL
     image_bytes = await file.read()
