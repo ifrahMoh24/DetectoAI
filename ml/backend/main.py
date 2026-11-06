@@ -48,10 +48,12 @@ async def detect_damage(file: UploadFile = File(...)):
 
     # Read bytes and open with PIL
     image_bytes = await file.read()
+    print(f"📥 Received file: {file.filename}, content_type={file.content_type}, size={len(image_bytes)} bytes")
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid image file")
+    except Exception as e:
+        print(f"❌ PIL error: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {e}")
 
     # Run inference
     try:
