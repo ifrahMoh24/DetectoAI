@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import '../services/history_service.dart';
 import '../models/scan_result.dart';
+import 'results_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -217,7 +218,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         child: const Icon(Icons.delete_rounded, color: Color(0xFFEF4444)),
       ),
-      child: Container(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ResultsScreen(
+                imagePath: result.imagePath,
+                prediction: {
+                  'class': result.damageType,
+                  'confidence': result.confidence,
+                  'probabilities': result.probabilities,
+                },
+                readOnly: true,
+              ),
+            ),
+          );
+        },
+        child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: kCard,
@@ -305,6 +324,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

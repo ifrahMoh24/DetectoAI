@@ -75,6 +75,19 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       await _updateStep(2);
       final result = await _apiService.predict(widget.imagePath);
 
+      // Confidence threshold — below 55% means unclear image or not a phone
+      if (result.confidence < 0.55) {
+        HapticFeedback.heavyImpact();
+        if (mounted) {
+          setState(() {
+            _isAnalyzing = false;
+            _errorMessage = 'Image unclear or not a phone.\n\nFor best results:\n• Frame the full phone in view\n• Use good lighting\n• Hold camera steady (no blur)\n• Get close to the damage area';
+            _currentStep = 'Unclear Image';
+          });
+        }
+        return;
+      }
+
       // Step 4: Calculate
       await _updateStep(3);
       await Future.delayed(const Duration(milliseconds: 600));

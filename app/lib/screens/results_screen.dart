@@ -8,11 +8,13 @@ import '../models/scan_result.dart';
 class ResultsScreen extends StatefulWidget {
   final String imagePath;
   final Map<String, dynamic> prediction;
+  final bool readOnly;
 
   const ResultsScreen({
     super.key,
     required this.imagePath,
     required this.prediction,
+    this.readOnly = false,
   });
 
   @override
@@ -73,7 +75,8 @@ class _ResultsScreenState extends State<ResultsScreen>
     _scaleController.forward();
     HapticFeedback.mediumImpact();
 
-    _autoSave();
+    if (!widget.readOnly) _autoSave();
+    if (widget.readOnly) setState(() => _savedToHistory = true);
   }
 
   Future<void> _autoSave() async {
@@ -603,13 +606,14 @@ class _ResultsScreenState extends State<ResultsScreen>
   }
 
   String _getRepairCosts() {
+    final base = ResaleCalculator.baseValues[_selectedPhone] ?? 500.0;
     switch (_detectedClass) {
       case 'crack':
-        return '\$100 – \$300';
+        return '\$${(base * 0.10).toInt()} – \$${(base * 0.30).toInt()}';
       case 'dent':
-        return '\$80 – \$200';
+        return '\$${(base * 0.05).toInt()} – \$${(base * 0.20).toInt()}';
       case 'scratch':
-        return '\$50 – \$120';
+        return '\$${(base * 0.03).toInt()} – \$${(base * 0.12).toInt()}';
       default:
         return 'N/A';
     }
