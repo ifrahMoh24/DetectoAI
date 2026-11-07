@@ -10,7 +10,6 @@ DetectoAI uses a YOLOv8 classification model to detect phone damage from a photo
 
 <p float="left">
   <img src="screenshots/home.webp" width="23%" />
-  <img src="screenshots/results1.webp" width="23%" />
   <img src="screenshots/results2.png" width="23%" />
   <img src="screenshots/results3.png" width="23%" />
 </p>
