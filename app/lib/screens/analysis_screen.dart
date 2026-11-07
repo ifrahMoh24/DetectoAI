@@ -75,6 +75,19 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       await _updateStep(2);
       final result = await _apiService.predict(widget.imagePath);
 
+      // Confidence threshold — below 55% means unclear image or not a phone
+      if (result.confidence < 0.55) {
+        HapticFeedback.heavyImpact();
+        if (mounted) {
+          setState(() {
+            _isAnalyzing = false;
+            _errorMessage = 'Image unclear or not a phone.\n\nFor best results:\n• Frame the full phone in view\n• Use good lighting\n• Hold camera steady (no blur)\n• Get close to the damage area';
+            _currentStep = 'Unclear Image';
+          });
+        }
+        return;
+      }
+
       // Step 4: Calculate
       await _updateStep(3);
       await Future.delayed(const Duration(milliseconds: 600));
@@ -99,7 +112,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                     'description': result.description,
                     'emoji': result.emoji,
                     'colorHex': result.colorHex,
-                    'allPredictions': result.allPredictions,
+                    'probabilities': result.allPredictions,
                   },
                 ),
             transitionsBuilder:
@@ -150,17 +163,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFF0FDFA),
-              const Color(0xFFCCFBF1),
-              const Color(0xFFD1FAE5).withOpacity(0.5),
-            ],
-          ),
-        ),
+        color: const Color(0xFF0A0F1E),
         child: SafeArea(
           child: Column(
             children: [
@@ -173,10 +176,10 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(
                         Icons.arrow_back_rounded,
-                        color: Color(0xFF065F46),
+                        color: Colors.white,
                       ),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF1E293B),
                         padding: const EdgeInsets.all(12),
                       ),
                     ),
@@ -186,7 +189,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF065F46),
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -309,18 +312,18 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF065F46),
+                            color: Colors.white,
                           ),
                           textAlign: TextAlign.center,
                         ),
 
                         const SizedBox(height: 12),
 
-                        Text(
-                          'AI is verifying your product...',
+                        const Text(
+                          'AI is analyzing damage...',
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.grey.shade600,
+                            color: Color(0xFF94A3B8),
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -424,19 +427,12 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.2),
-          width: 2,
+          color: const Color(0xFF334155),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Column(
         children: _steps.asMap().entries.map((entry) {
@@ -461,13 +457,13 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                         : null,
                     color: isCompleted || isCurrent
                         ? null
-                        : Colors.grey.shade200,
+                        : const Color(0xFF334155),
                   ),
                   child: Icon(
                     isCompleted ? Icons.check_rounded : step.icon,
                     color: isCompleted || isCurrent
                         ? Colors.white
-                        : Colors.grey.shade400,
+                        : const Color(0xFF64748B),
                     size: 18,
                   ),
                 ),
@@ -483,8 +479,8 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                       color: isCompleted
                           ? const Color(0xFF10B981)
                           : isCurrent
-                          ? const Color(0xFF065F46)
-                          : Colors.grey.shade500,
+                          ? Colors.white
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ),
